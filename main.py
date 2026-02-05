@@ -1,14 +1,18 @@
-#!/usr/bin/env python3
+import argparse, tempfile, threading
 import whisper
 import sounddevice as sd
 import soundfile as sf
 import numpy as np
 from pynput.keyboard import Listener, Key, Controller
-import tempfile, threading
 
-model = whisper.load_model("base")
+p = argparse.ArgumentParser(epilog="example: %(prog)s --model base --key alt_r")
+p.add_argument("--model", help="whisper model: tiny, base, small, medium, large")
+p.add_argument("--key", help="pynput Key name: f8, alt_r, ctrl_l, etc. See https://pynput.readthedocs.io/en/latest/keyboard.html#pynput.keyboard.Key")
+args = p.parse_args()
+
+model = whisper.load_model(args.model)
 kbd = Controller()
-HOTKEY = Key.alt_r
+hotkey = getattr(Key, args.key, None)
 
 def record(hotkey):
     pressed = threading.Event()
@@ -38,7 +42,7 @@ def transcribe(audio):
         return model.transcribe(f.name, fp16=False)["text"]
 
 while True:
-    audio = record(HOTKEY)
+    audio = record(hotkey)
     text = transcribe(audio)
     print(f"transcribed: {text}")
     kbd.type(text)
