@@ -6,21 +6,6 @@ import numpy as np
 from pynput.keyboard import Listener, Key, Controller
 
 
-# argparse
-p = argparse.ArgumentParser(epilog="example: %(prog)s --model base --key alt_r")
-p.add_argument("--model", default='base', choices=whisper.available_models(), help="whisper model name")
-p.add_argument("--key", default='alt_r', choices=[k.name for k in Key], help="pynput Key name, see https://pynput.readthedocs.io/en/latest/keyboard.html#pynput.keyboard.Key")
-args = p.parse_args()
-
-# init
-print(f"hotkey: {args.key}; model {args.model}")
-hotkey = getattr(Key, args.key)
-
-print(f"loading model ...")
-model = whisper.load_model(args.model)
-print("loaded")
-
-# main loop
 def record(hotkey):
     """Block until the hotkey is pressed and released, return the audio as an np.ndarray"""
     pressed = threading.Event()
@@ -46,15 +31,31 @@ def record(hotkey):
     print(f"duration: {len(audio) / 16000:.1f}s, rms: {np.sqrt(np.mean(audio ** 2)):.4f}")
     return audio
 
-def transcribe(audio) -> str:
+def transcribe(model, audio) -> str:
     """Return transcribed text"""
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
         sf.write(f.name, audio, 16000)
         return model.transcribe(f.name, fp16=False)["text"]
 
-kbd = Controller()
-while True:
-    audio = record(hotkey)
-    text = transcribe(audio)
-    print(f"transcribed: {text}")
-    kbd.type(text)
+def main():
+    p = argparse.ArgumentParser(epilog="example: %(prog)s --model base --key alt_r")
+    p.add_argument("--model", default='base', choices=whisper.available_models(), help="whisper model name")
+    p.add_argument("--key", default='alt_r', choices=[k.name for k in Key], help="pynput Key name, see https://pynput.readthedocs.io/en/latest/keyboard.html#pynput.keyboard.Key")
+    args = p.parse_args()
+
+    print(f"hotkey: {args.key}; model {args.model}")
+    hotkey = getattr(Key, args.key)
+
+    print(f"loading model ...")
+    model = whisper.load_model(args.model)
+    print("loaded")
+
+    kbd = Controller()
+    while True:
+        audio = record(hotkey)
+        text = transcribe(model, audio)
+        print(f"transcribed: {text}")
+        kbd.type(text)
+
+if __name__ == "__main__":
+    main()
