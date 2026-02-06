@@ -52,11 +52,14 @@ def main():
     print("loaded")
 
     kbd = Controller()
-    while True:
-        audio = record(hotkey)
-        text = transcribe(model, audio)
-        print(f"transcribed: {text}")
-        kbd.type(text)
+    try:
+        while True:
+            audio = record(hotkey)
+            text = transcribe(model, audio)
+            print(f"transcribed: {text}")
+            kbd.type(text)
+    except KeyboardInterrupt:
+        pass
 
 if __name__ == "__main__":
     main()
