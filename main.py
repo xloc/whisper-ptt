@@ -1,4 +1,4 @@
-import argparse, tempfile, threading
+import argparse, os, tempfile, threading
 import whisper
 import sounddevice as sd
 import soundfile as sf
@@ -32,10 +32,11 @@ def record(hotkey):
     return audio
 
 def transcribe(model, audio) -> str:
-    """Return transcribed text"""
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
         sf.write(f.name, audio, 16000)
-        return model.transcribe(f.name, fp16=False)["text"]
+    text = model.transcribe(f.name, fp16=False)["text"]
+    os.unlink(f.name)
+    return text
 
 def main():
     p = argparse.ArgumentParser(epilog="example: %(prog)s --model base --key alt_r")
