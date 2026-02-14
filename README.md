@@ -11,7 +11,8 @@ uvx whisper-ptt --model base --key alt_r
 
 ## Options
 
-- `--model` — Whisper model (tiny, base, small, medium, large). Default: `base`
+- `--model` — Whisper model. Default: `base`. Common choices: `tiny`, `base`, `small`, `medium`, `large-v3-turbo`. 
+    - Run `uvx whisper-ptt --help` for full list.
 - `--key` — Hotkey name from `pynput.keyboard.Key`. Default: `alt_r`
 
 ## macOS permissions
@@ -28,3 +29,12 @@ To grant accessibility access:
 3. If already listed, toggle it off and back on
 
 Microphone access is prompted automatically on first use.
+
+## Release
+
+```bash
+git tag v1.0.x
+git push --tags
+```
+
+CI runs tests and publishes to PyPI automatically.

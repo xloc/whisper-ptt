@@ -395,8 +395,7 @@ wheels = [
 
 [[package]]
 name = "whisper-ptt"
-version = "1.0.2"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "pynput" },
     { name = "pywhispercpp" },
