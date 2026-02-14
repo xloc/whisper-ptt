@@ -5,7 +5,7 @@ description = "Push-to-talk speech-to-text input using OpenAI Whisper"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "openai-whisper",
+    "pywhispercpp",
     "sounddevice",
     "soundfile",
     "pynput",
@@ -17,3 +17,8 @@ Source = "https://github.com/xloc/whisper-ptt"
 
 [project.scripts]
 whisper-ptt = "main:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
