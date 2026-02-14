@@ -1,4 +1,6 @@
-import argparse, os, tempfile, threading
+import argparse, os, sys, tempfile, threading
+assert sys.platform != "win32", "Windows is not supported"
+import fcntl
 from pywhispercpp.model import Model
 from pywhispercpp.constants import AVAILABLE_MODELS
 import sounddevice as sd
@@ -25,7 +27,8 @@ def record(hotkey):
         stream = sd.InputStream(samplerate=16000, channels=1, callback=lambda indata, *_: chunks.append(indata.copy()))
         stream.start()
         print("recording...")
-        released.wait()
+        while not released.wait(timeout=0.1):
+            pass
         stream.stop()
         stream.close()
     audio = np.concatenate(chunks)
@@ -41,6 +44,13 @@ def transcribe(model, audio) -> str:
     return text
 
 def main():
+    # Prevent multiple instances; lock is auto-released on exit
+    lock = open("/tmp/whisper-ptt.lock", "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        exit("Another instance is already running")
+
     from pynput.keyboard import Key, Controller
     p = argparse.ArgumentParser(epilog="example: %(prog)s --model base --key alt_r")
     p.add_argument("--model", default='base', choices=AVAILABLE_MODELS, help="whisper model name")
