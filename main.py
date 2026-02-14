@@ -4,10 +4,10 @@ from pywhispercpp.constants import AVAILABLE_MODELS
 import sounddevice as sd
 import soundfile as sf
 import numpy as np
-from pynput.keyboard import Listener, Key, Controller
 
 
 def record(hotkey):
+    from pynput.keyboard import Listener
     """Block until the hotkey is pressed and released, return the audio as an np.ndarray"""
     pressed = threading.Event()
     released = threading.Event()
@@ -41,6 +41,7 @@ def transcribe(model, audio) -> str:
     return text
 
 def main():
+    from pynput.keyboard import Key, Controller
     p = argparse.ArgumentParser(epilog="example: %(prog)s --model base --key alt_r")
     p.add_argument("--model", default='base', choices=AVAILABLE_MODELS, help="whisper model name")
     p.add_argument("--lang", help="language code (en, zh, ja, etc.), omit for auto-detection")
