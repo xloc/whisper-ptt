@@ -1,4 +1,4 @@
-import argparse, os, sys, tempfile, threading
+import argparse, importlib.metadata, os, sys, tempfile, threading
 assert sys.platform != "win32", "Windows is not supported"
 import fcntl
 from pywhispercpp.model import Model
@@ -53,6 +53,7 @@ def main():
 
     from pynput.keyboard import Key, Controller
     p = argparse.ArgumentParser(epilog="example: %(prog)s --model base --key alt_r")
+    p.add_argument("--version", action="version", version=importlib.metadata.version("whisper-ptt"))
     p.add_argument("--model", default='base', choices=AVAILABLE_MODELS, help="whisper model name")
     p.add_argument("--lang", help="language code (en, zh, ja, etc.), omit for auto-detection")
     p.add_argument("--key", default='alt_r', choices=[k.name for k in Key],
