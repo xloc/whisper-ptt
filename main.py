@@ -1,4 +1,4 @@
-import argparse, importlib.metadata, os, sys, tempfile, threading
+import argparse, importlib.metadata, os, signal, sys, tempfile, threading, time
 assert sys.platform != "win32", "Windows is not supported"
 import fcntl
 from pywhispercpp.model import Model
@@ -7,6 +7,8 @@ import sounddevice as sd
 import soundfile as sf
 import numpy as np
 
+stop = threading.Event()
+signal.signal(signal.SIGINT, lambda *_: stop.set())
 
 def record(hotkey):
     from pynput.keyboard import Listener
@@ -21,17 +23,20 @@ def record(hotkey):
         if key == hotkey:
             pressed.clear()
             released.set()
-    with Listener(on_press=on_press, on_release=on_release):
-        pressed.wait()
+    with Listener(on_press=on_press, on_release=on_release) as listener:
+        while not pressed.wait(timeout=0.5):
+            if stop.is_set():
+                return None
         chunks = []
         stream = sd.InputStream(samplerate=16000, channels=1, callback=lambda indata, *_: chunks.append(indata.copy()))
         stream.start()
         print("recording...")
         while not released.wait(timeout=0.1):
-            pass
+            if stop.is_set() or not listener.is_alive():
+                break
         stream.stop()
         stream.close()
-    if not chunks:
+    if stop.is_set() or not chunks:
         return None
     audio = np.concatenate(chunks)
     print(f"duration: {len(audio) / 16000:.1f}s, rms: {np.sqrt(np.mean(audio ** 2)):.4f}")
@@ -70,16 +75,13 @@ def main():
     print("loaded")
 
     kbd = Controller()
-    try:
-        while True:
-            audio = record(hotkey)
-            if audio is None:
-                continue
-            text = transcribe(model, audio)
-            print(f"transcribed: {text}")
-            kbd.type(text)
-    except KeyboardInterrupt:
-        pass
+    while not stop.is_set():
+        audio = record(hotkey)
+        if audio is None:
+            continue
+        text = transcribe(model, audio)
+        print(f"transcribed: {text}")
+        kbd.type(text)
 
 if __name__ == "__main__":
     main()
