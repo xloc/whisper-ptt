@@ -48,11 +48,14 @@ def hotkey_listener(hotkey):
     from pynput.keyboard import Listener
     pressed = threading.Event()
     released = threading.Event()
+    held = set()
     def on_press(key):
-        if key == hotkey:
+        held.add(key)
+        if key == hotkey and held == {hotkey}:
             released.clear()
             pressed.set()
     def on_release(key):
+        held.discard(key)
         if key == hotkey:
             pressed.clear()
             released.set()
