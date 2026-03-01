@@ -11,7 +11,39 @@ import numpy as np
 stop = threading.Event()
 signal.signal(signal.SIGINT, lambda *_: stop.set())
 
-def record(pressed, released, listener):
+@contextmanager
+def hotkey_listener(hotkey):
+    # Must remain alive for the entire session — never stop and restart between recordings.
+    # Pasting via kbd.tap() while this listener is active prevents transcribed text from
+    # leaking into the terminal's pty buffer on Ctrl+C.
+    # See docs/ctrl-c-leak-investigation.md for details.
+    from pynput.keyboard import Key, Listener
+    pressed = threading.Event()
+    released = threading.Event()
+    cancelled = threading.Event()
+    held = set()
+    def on_press(key):
+        held.add(key)
+        if key == hotkey and held == {hotkey}:
+            # Start recording only if hotkey is the sole key held (avoid combo misfires)
+            cancelled.clear()
+            released.clear()
+            pressed.set()
+        elif key == Key.esc and pressed.is_set():
+            # ESC during recording: abort and discard audio
+            cancelled.set()
+            pressed.clear()
+            released.set()  # unblock record()'s wait loop
+    def on_release(key):
+        held.discard(key)
+        if key == hotkey:
+            # Normal end of recording
+            pressed.clear()
+            released.set()
+    with Listener(on_press=on_press, on_release=on_release) as listener:
+        yield pressed, released, cancelled, listener
+
+def record(pressed, released, cancelled, listener):
     """Block until the hotkey is pressed and released, return the audio as an np.ndarray"""
     while not pressed.wait(timeout=0.5):
         if stop.is_set():
@@ -27,6 +59,9 @@ def record(pressed, released, listener):
     stream.close()
     if stop.is_set() or not chunks:
         return None
+    if cancelled.is_set():
+        print("cancelled")
+        return None
     audio = np.concatenate(chunks)
     print(f"duration: {len(audio) / 16000:.1f}s, rms: {np.sqrt(np.mean(audio ** 2)):.4f}")
     return audio
@@ -38,29 +73,6 @@ def transcribe(model, audio) -> str:
     text = ' '.join(segment.text for segment in segments)
     os.unlink(f.name)
     return text
-
-@contextmanager
-def hotkey_listener(hotkey):
-    # Must remain alive for the entire session — never stop and restart between recordings.
-    # Pasting via kbd.tap() while this listener is active prevents transcribed text from
-    # leaking into the terminal's pty buffer on Ctrl+C.
-    # See docs/ctrl-c-leak-investigation.md for details.
-    from pynput.keyboard import Listener
-    pressed = threading.Event()
-    released = threading.Event()
-    held = set()
-    def on_press(key):
-        held.add(key)
-        if key == hotkey and held == {hotkey}:
-            released.clear()
-            pressed.set()
-    def on_release(key):
-        held.discard(key)
-        if key == hotkey:
-            pressed.clear()
-            released.set()
-    with Listener(on_press=on_press, on_release=on_release) as listener:
-        yield pressed, released, listener
 
 def main():
     # Prevent multiple instances; lock is auto-released on exit
@@ -88,9 +100,9 @@ def main():
 
     kbd = Controller()
 
-    with hotkey_listener(hotkey) as (pressed, released, listener):
+    with hotkey_listener(hotkey) as (pressed, released, cancelled, listener):
         while not stop.is_set():
-            audio = record(pressed, released, listener)
+            audio = record(pressed, released, cancelled, listener)
             if audio is None: continue
             text = transcribe(model, audio)
             print(f"transcribed: {text}")
