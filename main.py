@@ -1,4 +1,5 @@
-import argparse, importlib.metadata, os, signal, subprocess, sys, tempfile, threading, time
+import argparse, importlib.metadata, os, signal, sys, tempfile, threading
+from contextlib import contextmanager
 assert sys.platform != "win32", "Windows is not supported"
 import fcntl
 from pywhispercpp.model import Model
@@ -10,32 +11,20 @@ import numpy as np
 stop = threading.Event()
 signal.signal(signal.SIGINT, lambda *_: stop.set())
 
-def record(hotkey):
-    from pynput.keyboard import Listener
+def record(pressed, released, listener):
     """Block until the hotkey is pressed and released, return the audio as an np.ndarray"""
-    pressed = threading.Event()
-    released = threading.Event()
-    def on_press(key):
-        if key == hotkey:
-            released.clear()
-            pressed.set()
-    def on_release(key):
-        if key == hotkey:
-            pressed.clear()
-            released.set()
-    with Listener(on_press=on_press, on_release=on_release) as listener:
-        while not pressed.wait(timeout=0.5):
-            if stop.is_set():
-                return None
-        chunks = []
-        stream = sd.InputStream(samplerate=16000, channels=1, callback=lambda indata, *_: chunks.append(indata.copy()))
-        stream.start()
-        print("recording...")
-        while not released.wait(timeout=0.1):
-            if stop.is_set() or not listener.is_alive():
-                break
-        stream.stop()
-        stream.close()
+    while not pressed.wait(timeout=0.5):
+        if stop.is_set():
+            return None
+    chunks = []
+    stream = sd.InputStream(samplerate=16000, channels=1, callback=lambda indata, *_: chunks.append(indata.copy()))
+    stream.start()
+    print("recording...")
+    while not released.wait(timeout=0.1):
+        if stop.is_set() or not listener.is_alive():
+            break
+    stream.stop()
+    stream.close()
     if stop.is_set() or not chunks:
         return None
     audio = np.concatenate(chunks)
@@ -49,6 +38,26 @@ def transcribe(model, audio) -> str:
     text = ' '.join(segment.text for segment in segments)
     os.unlink(f.name)
     return text
+
+@contextmanager
+def hotkey_listener(hotkey):
+    # Must remain alive for the entire session — never stop and restart between recordings.
+    # Pasting via kbd.tap() while this listener is active prevents transcribed text from
+    # leaking into the terminal's pty buffer on Ctrl+C.
+    # See docs/ctrl-c-leak-investigation.md for details.
+    from pynput.keyboard import Listener
+    pressed = threading.Event()
+    released = threading.Event()
+    def on_press(key):
+        if key == hotkey:
+            released.clear()
+            pressed.set()
+    def on_release(key):
+        if key == hotkey:
+            pressed.clear()
+            released.set()
+    with Listener(on_press=on_press, on_release=on_release) as listener:
+        yield pressed, released, listener
 
 def main():
     # Prevent multiple instances; lock is auto-released on exit
@@ -75,18 +84,14 @@ def main():
     print("loaded")
 
     kbd = Controller()
-    while not stop.is_set():
-        audio = record(hotkey)
-        if audio is None:
-            continue
 
-        text = transcribe(model, audio)
-        print(f"transcribed: {text}")
-        
-        # paste
-        subprocess.run(['pbcopy'], input=text.encode(), check=True)
-        with kbd.pressed(Key.cmd):
-            kbd.tap('v')
+    with hotkey_listener(hotkey) as (pressed, released, listener):
+        while not stop.is_set():
+            audio = record(pressed, released, listener)
+            if audio is None: continue
+            text = transcribe(model, audio)
+            print(f"transcribed: {text}")
+            kbd.type(text)
 
 if __name__ == "__main__":
     main()
