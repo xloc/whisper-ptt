@@ -31,6 +31,8 @@ def record(hotkey):
             pass
         stream.stop()
         stream.close()
+    if not chunks:
+        return None
     audio = np.concatenate(chunks)
     print(f"duration: {len(audio) / 16000:.1f}s, rms: {np.sqrt(np.mean(audio ** 2)):.4f}")
     return audio
@@ -71,6 +73,8 @@ def main():
     try:
         while True:
             audio = record(hotkey)
+            if audio is None:
+                continue
             text = transcribe(model, audio)
             print(f"transcribed: {text}")
             kbd.type(text)
