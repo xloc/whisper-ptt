@@ -1,4 +1,4 @@
-import argparse, importlib.metadata, os, signal, sys, tempfile, threading, time
+import argparse, importlib.metadata, os, signal, subprocess, sys, tempfile, threading, time
 assert sys.platform != "win32", "Windows is not supported"
 import fcntl
 from pywhispercpp.model import Model
@@ -79,9 +79,14 @@ def main():
         audio = record(hotkey)
         if audio is None:
             continue
+
         text = transcribe(model, audio)
         print(f"transcribed: {text}")
-        kbd.type(text)
+        
+        # paste
+        subprocess.run(['pbcopy'], input=text.encode(), check=True)
+        with kbd.pressed(Key.cmd):
+            kbd.tap('v')
 
 if __name__ == "__main__":
     main()
