@@ -110,7 +110,7 @@ def main():
     hotkey = getattr(Key, args.key)
 
     print(f"loading model ...")
-    model = Model(args.model, print_realtime=False, print_progress=False, redirect_whispercpp_logs_to=None, language=args.lang)
+    model = Model(args.model, print_realtime=False, print_progress=False, redirect_whispercpp_logs_to=None, language=args.lang, translate=False)
     print("loaded")
 
     kbd = Controller()
