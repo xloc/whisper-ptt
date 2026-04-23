@@ -19,11 +19,8 @@ def hotkey_listener(hotkey):
     pressed = threading.Event()
     released = threading.Event()
     cancelled = threading.Event()
-    held = set()
     def on_press(key):
-        held.add(key)
-        if key == hotkey and held == {hotkey}:
-            # Start recording only if hotkey is the sole key held (avoid combo misfires)
+        if key == hotkey:
             cancelled.clear()
             released.clear()
             pressed.set()
@@ -33,9 +30,7 @@ def hotkey_listener(hotkey):
             pressed.clear()
             released.set()  # unblock record()'s wait loop
     def on_release(key):
-        held.discard(key)
         if key == hotkey:
-            # Normal end of recording
             pressed.clear()
             released.set()
     with Listener(on_press=on_press, on_release=on_release) as listener:
@@ -50,7 +45,6 @@ def record(pressed, released, cancelled, listener):
     chunks = []
     stream = sd.InputStream(samplerate=16000, channels=1, callback=lambda indata, *_: chunks.append(indata.copy()))
     stream.start()
-    print("recording...")
     while not released.wait(timeout=0.1):
         if stop.is_set() or not listener.is_alive():
             break
@@ -59,11 +53,8 @@ def record(pressed, released, cancelled, listener):
     if stop.is_set() or not chunks:
         return None
     if cancelled.is_set():
-        print("cancelled")
         return None
-    audio = np.concatenate(chunks)
-    print(f"duration: {len(audio) / 16000:.1f}s, rms: {np.sqrt(np.mean(audio ** 2)):.4f}")
-    return audio
+    return np.concatenate(chunks)
 
 
 def transcribe(model, audio) -> str:
