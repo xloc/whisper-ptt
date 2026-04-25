@@ -45,6 +45,7 @@ def record(pressed, released, cancelled, listener):
     chunks = []
     stream = sd.InputStream(samplerate=16000, channels=1, callback=lambda indata, *_: chunks.append(indata.copy()))
     stream.start()
+    print('recording...')
     while not released.wait(timeout=0.1):
         if stop.is_set() or not listener.is_alive():
             break
@@ -53,8 +54,11 @@ def record(pressed, released, cancelled, listener):
     if stop.is_set() or not chunks:
         return None
     if cancelled.is_set():
+        print('canceled')
         return None
-    return np.concatenate(chunks)
+    audio = np.concatenate(chunks)
+    print(f"duration: {len(audio) / 16000:.1f}s, rms: {np.sqrt(np.mean(audio ** 2)):.4f}")
+    return audio
 
 
 def transcribe(model, audio) -> str:
