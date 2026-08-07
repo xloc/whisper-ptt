@@ -1,13 +1,10 @@
-import argparse, fcntl, importlib.metadata, os, signal, sys, tempfile, threading, time
+import argparse, fcntl, importlib.metadata, os, sys, tempfile, threading, time
 from contextlib import contextmanager
 import numpy as np
 import sounddevice as sd
 import soundfile as sf
 from pywhispercpp.model import Model
 from pywhispercpp.constants import AVAILABLE_MODELS
-
-stop = threading.Event()
-signal.signal(signal.SIGINT, lambda *_: stop.set())
 
 @contextmanager
 def hotkey_listener(hotkey):
@@ -39,19 +36,14 @@ def hotkey_listener(hotkey):
 
 def record(pressed, released, cancelled, listener):
     """Block until the hotkey is pressed and released, return the audio as an np.ndarray"""
-    while not pressed.wait(timeout=0.5):
-        if stop.is_set():
-            return None
+    pressed.wait()
     chunks = []
-    stream = sd.InputStream(samplerate=16000, channels=1, callback=lambda indata, *_: chunks.append(indata.copy()))
-    stream.start()
-    print('recording...')
-    while not released.wait(timeout=0.1):
-        if stop.is_set() or not listener.is_alive():
-            break
-    stream.stop()
-    stream.close()
-    if stop.is_set() or not chunks:
+    with sd.InputStream(samplerate=16000, channels=1, callback=lambda indata, *_: chunks.append(indata.copy())):
+        print('recording...')
+        while not released.wait(timeout=0.1):
+            if not listener.is_alive():
+                break
+    if not chunks:
         return None
     if cancelled.is_set():
         print('canceled')
@@ -128,7 +120,7 @@ def main():
     kbd = Controller()
 
     with hotkey_listener(hotkey) as (pressed, released, cancelled, listener):
-        while not stop.is_set():
+        while True:
             audio = record(pressed, released, cancelled, listener)
             if audio is None: continue
             text = transcribe(model, audio)
@@ -137,4 +129,7 @@ def main():
 
 if __name__ == "__main__":
     assert sys.platform != "win32", "Windows is not supported"
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
