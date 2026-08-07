@@ -90,7 +90,7 @@ def models():
     return 'models:\n' + '\n'.join(lines)
 
 
-def main():
+def run():
     from pynput.keyboard import Key, Controller
     p = argparse.ArgumentParser(
         epilog=f'example: %(prog)s --model base --key alt_r\n\n{models()}',
@@ -127,9 +127,14 @@ def main():
             print(f"transcribed: {text}")
             paste(text, kbd)
 
-if __name__ == "__main__":
+
+def main():
     assert sys.platform != "win32", "Windows is not supported"
     try:
-        main()
+        run()
     except KeyboardInterrupt:
         pass
+
+
+if __name__ == "__main__":
+    main()
