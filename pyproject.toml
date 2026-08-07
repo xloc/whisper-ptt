@@ -9,6 +9,7 @@ dependencies = [
     "sounddevice",
     "soundfile",
     "pynput",
+    "pyperclip",
 ]
 
 [project.urls]

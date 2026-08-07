@@ -1,6 +1,6 @@
 # whisper-ptt
 
-Push-to-talk speech-to-text. Hold a key to record, release to transcribe and type.
+Push-to-talk speech-to-text. Hold a key to record, release to transcribe and paste.
 
 ## Usage
 
@@ -19,7 +19,7 @@ uvx whisper-ptt --model base --key alt_r
 
 This tool needs two macOS permissions to work:
 
-- **Accessibility** — to listen for hotkey presses and type transcribed text into the active window.
+- **Accessibility** — to listen for hotkey presses and paste transcribed text into the active window.
 - **Microphone** — to record audio.
 
 To grant accessibility access:

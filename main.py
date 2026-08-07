@@ -1,4 +1,4 @@
-import argparse, fcntl, importlib.metadata, os, signal, sys, tempfile, threading
+import argparse, fcntl, importlib.metadata, os, signal, sys, tempfile, threading, time
 from contextlib import contextmanager
 import numpy as np
 import sounddevice as sd
@@ -70,6 +70,23 @@ def transcribe(model, audio) -> str:
     return text
 
 
+def paste(text, kbd):
+    """Paste text without leaving our temporary value on the user's clipboard."""
+    import pyperclip
+    from pynput.keyboard import Key
+
+    previous_text = pyperclip.paste()
+    pyperclip.copy(text)
+    try:
+        with kbd.pressed(Key.cmd):
+            kbd.tap('v')
+        time.sleep(0.1)  # avoid event racing
+    finally:
+        # Never overwrite text copied after we installed the transcription.
+        if pyperclip.paste() == text:
+            pyperclip.copy(previous_text)
+
+
 def models():
     order = ['tiny', 'base', 'small', 'medium', 'large-v1', 'large-v2', 'large-v3']
     group = {k:[m for m in AVAILABLE_MODELS if m.startswith(k)] for k in order}
@@ -77,8 +94,8 @@ def models():
     if misc: 
         group['misc'] = list(misc)
 
-    lines = [f'  {k+':':<18}{', '.join(v)}' for k,v in group.items()]
-    return f'models:\n{"\n".join(lines)}'
+    lines = [f"  {k + ':':<18}{', '.join(v)}" for k, v in group.items()]
+    return 'models:\n' + '\n'.join(lines)
 
 
 def main():
@@ -116,7 +133,7 @@ def main():
             if audio is None: continue
             text = transcribe(model, audio)
             print(f"transcribed: {text}")
-            kbd.type(text)
+            paste(text, kbd)
 
 if __name__ == "__main__":
     assert sys.platform != "win32", "Windows is not supported"
